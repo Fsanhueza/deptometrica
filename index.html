@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conversor de JSON a Excel</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f7f9fc;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+        input[type="file"], button {
+            margin: 20px;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #1a2b4c;
+            background-color: #4caf50;
+            color: white;
+            cursor: pointer;
+        }
+        button {
+            background-color: #1a2b4c;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Convertir JSON a Excel</h1>
+        <input type="file" id="jsonFileInput" />
+        <button onclick="convertToExcel()">Generar Excel</button>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script>
+        function convertToExcel() {
+            const input = document.getElementById('jsonFileInput');
+            const file = input.files[0];
+            const reader = new FileReader();
+
+            reader.onload = function(e) {
+                const data = JSON.parse(e.target.result);
+                generateExcel(data);
+            };
+
+            if (file) {
+                reader.readAsText(file);
+            } else {
+                alert("Por favor, sube un archivo JSON.");
+            }
+        }
+
+        function generateExcel(data) {
+            const wb = XLSX.utils.book_new();
+
+            // Información general
+            const general_info = [
+                ["Información General", "Valor"],
+                ["RUT", data.rut.S],
+                ["Decoración Elegida", data.metrics.M.decoracionElegida.S],
+                ["Música Elegida", data.metrics.M.musicaElegida.S],
+                ["Fecha de Sesión", new Date(data.timestamp_sesion.S).toLocaleString()],
+                ["Duración Total (segundos)", data.metrics.M.tiempo_total.N]
+            ];
+            const ws_general = XLSX.utils.aoa_to_sheet(general_info);
+            XLSX.utils.book_append_sheet(wb, ws_general, "Info General");
+
+            // Detalles de métricas por habitación
+            const rooms = data.metrics.M.lugares.L.map(room => [
+                room.M.nombre.S,
+                room.M.interacciones.N,
+                room.M.mediciones.N,
+                room.M.tiempo.N
+            ]);
+            rooms.unshift(["Habitación", "Interacciones", "Mediciones", "Tiempo (segundos)"]);
+
+            const ws_metrics = XLSX.utils.aoa_to_sheet(rooms);
+            XLSX.utils.book_append_sheet(wb, ws_metrics, "Metricas");
+
+            // Guardar el archivo Excel
+            XLSX.writeFile(wb, "Departamento_Metricas.xlsx");
+        }
+    </script>
+</body>
+</html>
