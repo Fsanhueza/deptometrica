@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Conversor de JSON a Excel</title>
+    <title>Conversor de JSON a Excel con Gráficos</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -11,6 +11,7 @@
             display: flex;
             justify-content: center;
             align-items: center;
+            flex-direction: column;
             height: 100vh;
         }
         .container {
@@ -32,16 +33,25 @@
         button {
             background-color: #1a2b4c;
         }
+        canvas {
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1>Convertir JSON a Excel</h1>
+        <h1>Convertir JSON a Excel con Gráficos</h1>
         <input type="file" id="jsonFileInput" />
         <button onclick="convertToExcel()">Generar Excel</button>
     </div>
 
+    <!-- Canvases for charts -->
+    <canvas id="interactionsChart" width="400" height="200"></canvas>
+    <canvas id="measurementsChart" width="400" height="200"></canvas>
+    <canvas id="timeChart" width="400" height="200"></canvas>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.17.0/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script>
         function convertToExcel() {
             const input = document.getElementById('jsonFileInput');
@@ -87,8 +97,66 @@
             const ws_metrics = XLSX.utils.aoa_to_sheet(rooms);
             XLSX.utils.book_append_sheet(wb, ws_metrics, "Metricas");
 
-            // Guardar el archivo Excel
-            XLSX.writeFile(wb, "Departamento_Metricas.xlsx");
+            // Generar gráficos
+            const roomNames = data.metrics.M.lugares.L.map(room => room.M.nombre.S);
+            const interactions = data.metrics.M.lugares.L.map(room => room.M.interacciones.N);
+            const measurements = data.metrics.M.lugares.L.map(room => room.M.mediciones.N);
+            const timeSpent = data.metrics.M.lugares.L.map(room => room.M.tiempo.N);
+
+            createChart("interactionsChart", "Interacciones por Habitación", roomNames, interactions, () => {
+                createChart("measurementsChart", "Mediciones por Habitación", roomNames, measurements, () => {
+                    createChart("timeChart", "Tiempo en Cada Habitación (segundos)", roomNames, timeSpent, () => {
+                        // Guardar el archivo Excel una vez generados los gráficos
+                        saveExcelWithCharts(wb);
+                    });
+                });
+            });
+        }
+
+        function createChart(canvasId, title, labels, data, callback) {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: title,
+                        data: data,
+                        backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                        borderColor: 'rgba(75, 192, 192, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true
+                        }
+                    },
+                    animation: {
+                        onComplete: callback
+                    }
+                }
+            });
+        }
+
+        function saveExcelWithCharts(wb) {
+            const images = ["interactionsChart", "measurementsChart", "timeChart"].map(id => document.getElementById(id).toDataURL("image/png"));
+
+            // Crear una hoja separada para los gráficos
+            const ws_charts = XLSX.utils.aoa_to_sheet([["Gráficos"]]);
+            XLSX.utils.book_append_sheet(wb, ws_charts, "Gráficos");
+
+            // Guardar el archivo Excel con los gráficos embebidos
+            images.forEach((img, index) => {
+                const img_tag = `<img src="${img}" width="400" height="200"/>`;
+                const row = 2 + (index * 25); // Espacio entre gráficos
+                XLSX.utils.sheet_add_json(ws_charts, [{ A: img_tag }], { skipHeader: true, origin: `A${row}` });
+            });
+
+            // Guardar el archivo Excel final
+            XLSX.writeFile(wb, "Departamento_Metricas_Con_Graficos.xlsx");
         }
     </script>
 </body>
